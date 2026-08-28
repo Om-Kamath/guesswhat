@@ -64,6 +64,26 @@ export class Game {
     ];
   }
 
+  submitGuess(value) {
+    const n = this.state.guesses.length + 1;
+    this.state.guesses.push({ n, value, hint: null });
+    this._emit();
+    return [{ type: 'guess', payload: { value, guessNumber: n } }];
+  }
+
+  sendHint(direction) {
+    let target = null;
+    for (let i = this.state.guesses.length - 1; i >= 0; i--) {
+      if (this.state.guesses[i].hint === null) {
+        target = this.state.guesses[i];
+        break;
+      }
+    }
+    if (target) target.hint = direction;
+    this._emit();
+    return [{ type: 'hint', payload: { direction, forGuessNumber: target ? target.n : null } }];
+  }
+
   receive({ type, payload }) {
     const out = [];
     switch (type) {
@@ -95,6 +115,22 @@ export class Game {
           this.state.guesses = [];
           this.state.canConfirmWin = false;
           this.state.phase = 'playing';
+        }
+        this._emit();
+        break;
+      }
+      case 'guess': {
+        if (this.state.role === 'setter') {
+          this.state.guesses.push({ n: payload.guessNumber, value: payload.value, hint: null });
+          if (payload.value === this.state.secret) this.state.canConfirmWin = true;
+        }
+        this._emit();
+        break;
+      }
+      case 'hint': {
+        if (this.state.role === 'guesser') {
+          const g = this.state.guesses.find((x) => x.n === payload.forGuessNumber);
+          if (g) g.hint = payload.direction;
         }
         this._emit();
         break;

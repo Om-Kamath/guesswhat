@@ -105,3 +105,50 @@ describe('receive round_start', () => {
     expect(g.state.phase).toBe('setup');
   });
 });
+
+describe('guesses and hints', () => {
+  it('guesser records its own guess and emits a guess message', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    const res = g.submitGuess(50);
+    expect(g.state.guesses).toEqual([{ n: 1, value: 50, hint: null }]);
+    expect(outbound(res, 'guess').payload).toEqual({ value: 50, guessNumber: 1 });
+  });
+
+  it('setter records an incoming guess', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    g.receive({ type: 'guess', payload: { value: 50, guessNumber: 1 }, from: 'x' });
+    expect(g.state.guesses).toEqual([{ n: 1, value: 50, hint: null }]);
+    expect(g.state.canConfirmWin).toBe(false);
+  });
+
+  it('setter flags canConfirmWin when a guess equals the secret', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    g.receive({ type: 'guess', payload: { value: 42, guessNumber: 3 }, from: 'x' });
+    expect(g.state.canConfirmWin).toBe(true);
+  });
+
+  it('setter hint targets the latest un-hinted guess', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    g.receive({ type: 'guess', payload: { value: 50, guessNumber: 1 }, from: 'x' });
+    g.receive({ type: 'guess', payload: { value: 25, guessNumber: 2 }, from: 'x' });
+    const res = g.sendHint('higher');
+    expect(outbound(res, 'hint').payload).toEqual({ direction: 'higher', forGuessNumber: 2 });
+    expect(g.state.guesses[1].hint).toBe('higher');
+    expect(g.state.guesses[0].hint).toBe(null);
+  });
+
+  it('guesser applies an incoming hint to the matching guess', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    g.submitGuess(50);
+    g.receive({ type: 'hint', payload: { direction: 'lower', forGuessNumber: 1 }, from: 'x' });
+    expect(g.state.guesses[0].hint).toBe('lower');
+  });
+});
