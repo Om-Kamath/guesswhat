@@ -44,6 +44,13 @@ static site. One Vercel serverless function. Ably JS SDK in the browser.
 number and hidden message never leave the Setter's browser tab; the Guesser's
 client only ever receives the range, the hints, and the final reveal.
 
+**Handshake:** Ably presence drives the `hello` exchange. On channel attach and
+on every peer `enter`, a client re-broadcasts `hello { role }` (and, if not in
+`lobby`, a rejoining client also sends `resync`). This makes the exchange robust
+to either player joining first or reconnecting. A client whose role is unknown
+(a refreshed tab) sends `hello { role: null }`; the established peer replies with
+its own `hello` so the refreshed client can resolve its role as the opposite.
+
 ### Components
 
 | Unit | Responsibility | Depends on |
@@ -108,9 +115,11 @@ Published to the Ably channel named after the room code. Envelope:
 | `guess` | Guesser | `{ value, guessNumber }` | Setter appends to its guess list; Guesser also appends to its own list. |
 | `hint` | Setter | `{ direction: "higher" \| "lower", forGuessNumber }` | Guesser tags that guess with ↑ / ↓. |
 | `reveal` | Setter | `{ message, totalGuesses }` | Both → `finished`. |
-| `play_again` | either | `{}` | Both swap roles, `roundNumber++`, → `setup`. |
-| `resync` | rejoining client | `{}` | Other client replies with `state_snapshot`. |
-| `state_snapshot` | responding client | `{ phase, preset, min, max, roundNumber, guesses, hints }` | Rejoining client rebuilds its view. Never includes the secret or reveal message. |
+| `play_again` | either | `{ roundNumber }` | Both swap roles, adopt `roundNumber`, → `setup`. |
+| `new_round` | either | `{ roundNumber }` | Both keep roles, adopt `roundNumber`, → `setup`. Used after a lost round. |
+| `resync` | rejoining client | `{}` | Other client replies with `hello` + `state_snapshot`. |
+| `state_snapshot` | responding client | `{ phase, preset, min, max, roundNumber, guesses, revealedMessage, totalGuesses }` | Rejoining client rebuilds its view. Never includes the secret or the pre-win reveal message. |
+| `round_lost` | the client that detected it | `{}` | Both → `round_lost` screen ("New round" button sends `new_round`). |
 
 ## Connection & Error Handling
 
@@ -121,10 +130,14 @@ Published to the Ably channel named after the room code. Envelope:
   preserved; the screen is not torn down.
 - **Partner rejoins:** the reconnecting client broadcasts `resync`; the other
   client replies with `state_snapshot`, and the rejoiner rebuilds its view.
-- **Setter refresh mid-round:** the secret number and reveal message lived only
-  in that tab and are now gone. On the next `resync`, the round is declared
-  lost: both players see "Round lost — the setter's page was reloaded" and a
-  "New round" button (returns to `setup` with roles unchanged). This is an
+- **Setter refresh mid-round:** the room code is mirrored into the URL hash
+  (`#ABCDE`), so a reload reconnects to the same channel. But the secret number
+  and reveal message lived only in that tab and are gone. On reconnect the
+  refreshed client sends `resync`, receives a `state_snapshot` whose phase is
+  `playing`, resolves its own role to `setter`, finds its `secret` is null, and
+  declares the round lost: it broadcasts `round_lost` and both players see
+  "Round lost — the setter's page was reloaded" with a "New round" button
+  (sends `new_round`; returns to `setup` with roles unchanged). This is an
   accepted v1 limitation of approach A.
 - **Bad room code:** joining a channel that has no other participant simply
   keeps the joiner in `lobby` with "waiting for partner…"; there is no error
