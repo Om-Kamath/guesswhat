@@ -316,6 +316,64 @@ describe('reconnection', () => {
     expect(g.state.min).toBe(1);
   });
 
+  it('an unanswered resync latch self-heals once this client starts a round', () => {
+    // A reloads while alone: it sends resync, nobody authoritative answers, latch sticks.
+    const g = new Game({ role: null });
+    g.resync();
+    g.receive({ type: 'hello', payload: { role: 'guesser' }, from: 'x' }); // role -> setter
+    // The round proceeds normally; A is the setter.
+    g.startRound({ preset: 'medium', secret: 42, message: 'hi' });
+    // Later the partner reloads mid-round and asks for a snapshot. A must answer.
+    const res = g.receive({ type: 'resync', payload: {}, from: 'x' });
+    const snap = outbound(res, 'state_snapshot');
+    expect(snap).toBeTruthy();
+    expect(snap.payload.phase).toBe('playing');
+    expect(outbound(res, 'hello')).toBeTruthy();
+  });
+
+  it('an unanswered resync latch self-heals when this client receives round_start', () => {
+    const g = new Game({ role: null });
+    g.resync();
+    g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' }); // role -> guesser
+    g.receive({
+      type: 'round_start',
+      payload: { preset: 'medium', min: 1, max: 100, roundNumber: 1 },
+      from: 'x',
+    });
+    const res = g.receive({ type: 'resync', payload: {}, from: 'x' });
+    expect(outbound(res, 'state_snapshot')).toBeTruthy();
+  });
+
+  it('self-healing does not break the ordinary reload path (hello then snapshot)', () => {
+    // The answering peer sends hello BEFORE state_snapshot, so role resolution must not
+    // clear the latch — the snapshot we asked for still has to be accepted.
+    const g = new Game({ role: null });
+    g.resync();
+    g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' }); // role -> guesser
+    g.receive({
+      type: 'state_snapshot',
+      payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: 'higher' }], revealedMessage: null, totalGuesses: null },
+      from: 'x',
+    });
+    expect(g.state.phase).toBe('playing');
+    expect(g.state.guesses).toEqual([{ n: 1, value: 5, hint: 'higher' }]);
+  });
+
+  it('newRound and playAgain also clear a stuck latch', () => {
+    const a = new Game({ role: 'setter' });
+    a.resync();
+    a.newRound();
+    a.startRound({ preset: 'easy', secret: 5, message: 'hi' });
+    expect(outbound(a.receive({ type: 'resync', payload: {}, from: 'x' }), 'state_snapshot')).toBeTruthy();
+
+    const b = new Game({ role: 'setter' });
+    b.state.phase = 'finished';
+    b.resync();
+    b.playAgain(); // b is now the guesser, in setup with no preset — still not authoritative
+    b.receive({ type: 'round_start', payload: { preset: 'easy', min: 1, max: 20, roundNumber: 2 }, from: 'x' });
+    expect(outbound(b.receive({ type: 'resync', payload: {}, from: 'x' }), 'state_snapshot')).toBeTruthy();
+  });
+
   it('round_lost message moves either side to the round_lost screen', () => {
     const g = new Game({ role: 'guesser' });
     g.state.phase = 'playing';

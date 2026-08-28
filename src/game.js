@@ -53,6 +53,9 @@ export class Game {
   }
 
   startRound({ preset, secret, message }) {
+    // Any authoritative transition self-heals the latch: if the snapshot we once asked
+    // for never arrived, we must not stay permanently unable to answer a peer's resync.
+    this._awaitingSnapshot = false;
     const p = PRESETS[preset];
     this.state.preset = preset;
     this.state.min = p.min;
@@ -100,6 +103,7 @@ export class Game {
   }
 
   playAgain() {
+    this._awaitingSnapshot = false;
     freshRound(this.state);
     this.state.role = OPPOSITE[this.state.role];
     this.state.roundNumber += 1;
@@ -109,6 +113,7 @@ export class Game {
   }
 
   newRound() {
+    this._awaitingSnapshot = false;
     freshRound(this.state);
     this.state.roundNumber += 1;
     this.state.phase = 'setup';
@@ -158,6 +163,9 @@ export class Game {
       }
       case 'round_start': {
         if (this.state.role === 'guesser') {
+          // Remote authoritative transition — same self-heal as startRound() on the
+          // setter side. A round_start supersedes any snapshot we are still waiting for.
+          this._awaitingSnapshot = false;
           this.state.preset = payload.preset;
           this.state.min = payload.min;
           this.state.max = payload.max;
