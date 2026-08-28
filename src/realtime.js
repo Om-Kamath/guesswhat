@@ -14,7 +14,7 @@ export function createRealtime({ roomCode, tokenUrl = '/api/ably-token', AblyRea
     clientId,
 
     async connect() {
-      client = new Ctor({ authUrl: tokenUrl, clientId });
+      client = new Ctor({ authUrl: tokenUrl, clientId, echoMessages: false });
       channel = client.channels.get(roomCode);
       await channel.attach();
       await channel.presence.enter({});
@@ -25,7 +25,11 @@ export function createRealtime({ roomCode, tokenUrl = '/api/ably-token', AblyRea
     },
 
     on(type, handler) {
-      channel.subscribe(type, (msg) => handler(msg.data, msg.data && msg.data.from));
+      channel.subscribe(type, (msg) => {
+        // Defense in depth: echoMessages:false should already stop self-delivery.
+        if (msg.data && msg.data.from === clientId) return;
+        handler(msg.data, msg.data && msg.data.from);
+      });
     },
 
     onPresence(event, handler) {

@@ -7,6 +7,12 @@ describe('makeTokenRequest', () => {
     const AblyRest = vi.fn().mockImplementation(() => ({ auth: { createTokenRequest } }));
     const out = await makeTokenRequest(AblyRest, 'app.key:secret');
     expect(AblyRest).toHaveBeenCalledWith('app.key:secret');
+    expect(createTokenRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: '*', capability: expect.any(String) }),
+    );
+    expect(JSON.parse(createTokenRequest.mock.calls[0][0].capability)).toEqual({
+      '*': ['publish', 'subscribe', 'presence'],
+    });
     expect(out).toEqual({ keyName: 'k', nonce: 'n' });
   });
 

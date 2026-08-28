@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Game } from '../src/game.js';
 import { createFakeRealtimePair } from './fake-realtime.js';
-import { wire } from './drive.js';
+import { wire } from '../src/wire.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 

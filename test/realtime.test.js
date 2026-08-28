@@ -25,7 +25,9 @@ describe('createRealtime', () => {
     const { ctor, client, channel } = makeAblyStub();
     const rt = createRealtime({ roomCode: 'ABCDE', AblyRealtime: ctor });
     await rt.connect();
-    expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ authUrl: '/api/ably-token' }));
+    expect(ctor).toHaveBeenCalledWith(
+      expect.objectContaining({ authUrl: '/api/ably-token', echoMessages: false }),
+    );
     expect(client.channels.get).toHaveBeenCalledWith('ABCDE');
     expect(channel.attach).toHaveBeenCalled();
     expect(channel.presence.enter).toHaveBeenCalled();
@@ -49,6 +51,18 @@ describe('createRealtime', () => {
     rt.on('guess', (payload, from) => seen.push({ payload, from }));
     handlerArg({ data: { value: 7, from: 'peer' } });
     expect(seen).toEqual([{ payload: { value: 7, from: 'peer' }, from: 'peer' }]);
+  });
+
+  it('on() drops self-originated messages', async () => {
+    const { ctor, channel } = makeAblyStub();
+    let handlerArg;
+    channel.subscribe.mockImplementation((name, cb) => { if (name === 'guess') handlerArg = cb; });
+    const rt = createRealtime({ roomCode: 'ABCDE', AblyRealtime: ctor });
+    await rt.connect();
+    const seen = [];
+    rt.on('guess', (payload) => seen.push(payload));
+    handlerArg({ data: { value: 7, from: rt.clientId } });
+    expect(seen).toEqual([]);
   });
 
   it('onPresence maps enter/leave', async () => {

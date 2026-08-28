@@ -53,8 +53,14 @@ function screenSetup(state, actions) {
       el('div', { class: 'spinner' }),
     ]);
   }
-  let preset = 'medium';
-  const numberInput = el('input', { class: 'number-input', type: 'number', inputmode: 'numeric' });
+  let preset = state.preset && PRESETS[state.preset] ? state.preset : 'medium';
+  const numberInput = el('input', {
+    class: 'number-input',
+    type: 'number',
+    inputmode: 'numeric',
+    min: String(PRESETS[preset].min),
+    max: String(PRESETS[preset].max),
+  });
   const messageInput = el('textarea', { class: 'message-input', maxlength: '280', placeholder: 'A hidden message they see only when they win…' });
   const error = el('p', { class: 'error' });
 

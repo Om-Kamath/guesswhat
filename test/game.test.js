@@ -251,6 +251,7 @@ describe('reconnection', () => {
   it('a refreshed setter (no secret) mid-playing declares the round lost', () => {
     const g = new Game({ role: null });
     g.receive({ type: 'hello', payload: { role: 'guesser' }, from: 'x' }); // role -> setter
+    g.resync(); // the rebooting client asked for the snapshot
     const res = g.receive({
       type: 'state_snapshot',
       payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: 'higher' }], revealedMessage: null, totalGuesses: null },
@@ -263,6 +264,7 @@ describe('reconnection', () => {
   it('a refreshed guesser mid-playing resumes with the guess history', () => {
     const g = new Game({ role: null });
     g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' }); // role -> guesser
+    g.resync(); // the rebooting client asked for the snapshot
     g.receive({
       type: 'state_snapshot',
       payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: 'higher' }], revealedMessage: null, totalGuesses: null },
@@ -283,6 +285,35 @@ describe('reconnection', () => {
     });
     expect(g.state.phase).toBe('playing');
     expect(outbound(res, 'round_lost')).toBeFalsy();
+  });
+
+  it('a client still awaiting its own snapshot does not answer a peer resync', () => {
+    const g = new Game({ role: null });
+    g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' }); // role -> guesser, phase setup
+    g.resync();
+    const res = g.receive({ type: 'resync', payload: {}, from: 'x' });
+    expect(outbound(res, 'state_snapshot')).toBeFalsy();
+  });
+
+  it('a just-booted client in setup with no preset does not answer a peer resync', () => {
+    const g = new Game({ role: null });
+    g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' });
+    expect(g.state.phase).toBe('setup');
+    const res = g.receive({ type: 'resync', payload: {}, from: 'x' });
+    expect(outbound(res, 'state_snapshot')).toBeFalsy();
+  });
+
+  it('ignores a state_snapshot it did not ask for', () => {
+    const g = new Game({ role: 'setter' });
+    g.startRound({ preset: 'medium', secret: 42, message: 'hi' });
+    g.receive({
+      type: 'state_snapshot',
+      payload: { phase: 'setup', preset: null, min: null, max: null, roundNumber: 1, guesses: [], revealedMessage: null, totalGuesses: null },
+      from: 'x',
+    });
+    expect(g.state.phase).toBe('playing');
+    expect(g.state.secret).toBe(42);
+    expect(g.state.min).toBe(1);
   });
 
   it('round_lost message moves either side to the round_lost screen', () => {

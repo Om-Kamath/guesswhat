@@ -34,6 +34,10 @@ export class Game {
     this._listeners = [];
     this._seenRoles = new Set();
     this._helpedPeer = false;
+    // True between sending a `resync` and consuming the answering `state_snapshot`.
+    // While true this client is NOT authoritative: it must not answer a peer's resync,
+    // and it is the only window in which it accepts a state_snapshot.
+    this._awaitingSnapshot = false;
   }
 
   onChange(fn) {
@@ -126,6 +130,7 @@ export class Game {
   }
 
   resync() {
+    this._awaitingSnapshot = true;
     return [{ type: 'resync', payload: {} }];
   }
 
@@ -204,15 +209,22 @@ export class Game {
         break;
       }
       case 'resync': {
-        if (this.state.role) {
+        // Only an AUTHORITATIVE client answers: one that is not itself waiting for a
+        // snapshot and that actually holds a started round.
+        const authoritative =
+          !this._awaitingSnapshot &&
+          this.state.phase !== 'lobby' &&
+          !(this.state.phase === 'setup' && this.state.preset === null);
+        if (this.state.role && authoritative) {
           out.push({ type: 'hello', payload: { role: this.state.role } });
-          if (this.state.phase !== 'lobby') {
-            out.push({ type: 'state_snapshot', payload: this.snapshot() });
-          }
+          out.push({ type: 'state_snapshot', payload: this.snapshot() });
         }
         break;
       }
       case 'state_snapshot': {
+        // Ignore snapshots we did not ask for — they would clobber live round state.
+        if (!this._awaitingSnapshot) break;
+        this._awaitingSnapshot = false;
         const s = payload;
         if (this.state.role === 'setter' && this.state.secret === null && s.phase === 'playing') {
           this.state.phase = 'round_lost';
