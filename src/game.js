@@ -84,6 +84,17 @@ export class Game {
     return [{ type: 'hint', payload: { direction, forGuessNumber: target ? target.n : null } }];
   }
 
+  confirmWin() {
+    this.state.phase = 'finished';
+    this.state.revealedMessage = this.state.revealMessage;
+    this.state.totalGuesses = this.state.guesses.length;
+    this.state.canConfirmWin = false;
+    this._emit();
+    return [
+      { type: 'reveal', payload: { message: this.state.revealMessage, totalGuesses: this.state.guesses.length } },
+    ];
+  }
+
   receive({ type, payload }) {
     const out = [];
     switch (type) {
@@ -132,6 +143,14 @@ export class Game {
           const g = this.state.guesses.find((x) => x.n === payload.forGuessNumber);
           if (g) g.hint = payload.direction;
         }
+        this._emit();
+        break;
+      }
+      case 'reveal': {
+        this.state.phase = 'finished';
+        this.state.revealedMessage = payload.message;
+        this.state.totalGuesses = payload.totalGuesses;
+        this.state.canConfirmWin = false;
         this._emit();
         break;
       }

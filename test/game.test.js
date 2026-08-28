@@ -152,3 +152,29 @@ describe('guesses and hints', () => {
     expect(g.state.guesses[0].hint).toBe('lower');
   });
 });
+
+describe('confirm win and reveal', () => {
+  it('setter confirmWin enters finished and broadcasts the message', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    g.state.revealMessage = 'call me tonight';
+    g.receive({ type: 'guess', payload: { value: 42, guessNumber: 4 }, from: 'x' });
+    const res = g.confirmWin();
+    expect(g.state.phase).toBe('finished');
+    expect(g.state.revealedMessage).toBe('call me tonight');
+    expect(g.state.totalGuesses).toBe(1);
+    expect(g.state.canConfirmWin).toBe(false);
+    expect(outbound(res, 'reveal').payload).toEqual({ message: 'call me tonight', totalGuesses: 1 });
+  });
+
+  it('guesser applies an incoming reveal', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    g.submitGuess(42);
+    g.receive({ type: 'reveal', payload: { message: 'call me tonight', totalGuesses: 6 }, from: 'x' });
+    expect(g.state.phase).toBe('finished');
+    expect(g.state.revealedMessage).toBe('call me tonight');
+    expect(g.state.totalGuesses).toBe(6);
+  });
+});
