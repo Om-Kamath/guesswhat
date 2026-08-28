@@ -222,3 +222,81 @@ describe('play again and new round', () => {
     expect(g.state.phase).toBe('setup');
   });
 });
+
+describe('snapshot', () => {
+  it('never contains the secret or the pre-win message', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    g.state.revealMessage = 'secret note';
+    g.state.min = 1; g.state.max = 100; g.state.preset = 'medium';
+    const snap = g.snapshot();
+    expect(JSON.stringify(snap)).not.toContain('42');
+    expect(JSON.stringify(snap)).not.toContain('secret note');
+    expect(snap.phase).toBe('playing');
+    expect(snap.min).toBe(1);
+  });
+});
+
+describe('reconnection', () => {
+  it('resync responder returns hello + snapshot when mid-game', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    g.state.min = 1; g.state.max = 100;
+    const res = g.receive({ type: 'resync', payload: {}, from: 'x' });
+    expect(outbound(res, 'hello')).toBeTruthy();
+    expect(outbound(res, 'state_snapshot')).toBeTruthy();
+  });
+
+  it('a refreshed setter (no secret) mid-playing declares the round lost', () => {
+    const g = new Game({ role: null });
+    g.receive({ type: 'hello', payload: { role: 'guesser' }, from: 'x' }); // role -> setter
+    const res = g.receive({
+      type: 'state_snapshot',
+      payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: 'higher' }], revealedMessage: null, totalGuesses: null },
+      from: 'x',
+    });
+    expect(g.state.phase).toBe('round_lost');
+    expect(outbound(res, 'round_lost')).toBeTruthy();
+  });
+
+  it('a refreshed guesser mid-playing resumes with the guess history', () => {
+    const g = new Game({ role: null });
+    g.receive({ type: 'hello', payload: { role: 'setter' }, from: 'x' }); // role -> guesser
+    g.receive({
+      type: 'state_snapshot',
+      payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: 'higher' }], revealedMessage: null, totalGuesses: null },
+      from: 'x',
+    });
+    expect(g.state.phase).toBe('playing');
+    expect(g.state.guesses).toEqual([{ n: 1, value: 5, hint: 'higher' }]);
+  });
+
+  it('an established setter with its secret intact ignores the round_lost path', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'playing';
+    g.state.secret = 42;
+    const res = g.receive({
+      type: 'state_snapshot',
+      payload: { phase: 'playing', preset: 'medium', min: 1, max: 100, roundNumber: 1, guesses: [{ n: 1, value: 5, hint: null }], revealedMessage: null, totalGuesses: null },
+      from: 'x',
+    });
+    expect(g.state.phase).toBe('playing');
+    expect(outbound(res, 'round_lost')).toBeFalsy();
+  });
+
+  it('round_lost message moves either side to the round_lost screen', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    g.receive({ type: 'round_lost', payload: {}, from: 'x' });
+    expect(g.state.phase).toBe('round_lost');
+  });
+
+  it('synthetic presence messages toggle partnerPresent', () => {
+    const g = new Game({ role: 'setter' });
+    g.receive({ type: 'partner_here', payload: {}, from: 'local' });
+    expect(g.state.partnerPresent).toBe(true);
+    g.receive({ type: 'partner_left', payload: {}, from: 'local' });
+    expect(g.state.partnerPresent).toBe(false);
+  });
+});

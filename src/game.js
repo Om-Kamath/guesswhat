@@ -112,6 +112,23 @@ export class Game {
     return [{ type: 'new_round', payload: { roundNumber: this.state.roundNumber } }];
   }
 
+  snapshot() {
+    return {
+      phase: this.state.phase,
+      preset: this.state.preset,
+      min: this.state.min,
+      max: this.state.max,
+      roundNumber: this.state.roundNumber,
+      guesses: this.state.guesses.map((g) => ({ ...g })),
+      revealedMessage: this.state.revealedMessage,
+      totalGuesses: this.state.totalGuesses,
+    };
+  }
+
+  resync() {
+    return [{ type: 'resync', payload: {} }];
+  }
+
   receive({ type, payload }) {
     const out = [];
     switch (type) {
@@ -183,6 +200,48 @@ export class Game {
         freshRound(this.state);
         this.state.roundNumber = payload.roundNumber;
         this.state.phase = 'setup';
+        this._emit();
+        break;
+      }
+      case 'resync': {
+        if (this.state.role) {
+          out.push({ type: 'hello', payload: { role: this.state.role } });
+          if (this.state.phase !== 'lobby') {
+            out.push({ type: 'state_snapshot', payload: this.snapshot() });
+          }
+        }
+        break;
+      }
+      case 'state_snapshot': {
+        const s = payload;
+        if (this.state.role === 'setter' && this.state.secret === null && s.phase === 'playing') {
+          this.state.phase = 'round_lost';
+          out.push({ type: 'round_lost', payload: {} });
+        } else {
+          this.state.phase = s.phase;
+          this.state.preset = s.preset;
+          this.state.min = s.min;
+          this.state.max = s.max;
+          this.state.roundNumber = s.roundNumber;
+          this.state.guesses = s.guesses.map((g) => ({ ...g }));
+          this.state.revealedMessage = s.revealedMessage;
+          this.state.totalGuesses = s.totalGuesses;
+        }
+        this._emit();
+        break;
+      }
+      case 'round_lost': {
+        this.state.phase = 'round_lost';
+        this._emit();
+        break;
+      }
+      case 'partner_here': {
+        this.state.partnerPresent = true;
+        this._emit();
+        break;
+      }
+      case 'partner_left': {
+        this.state.partnerPresent = false;
         this._emit();
         break;
       }
