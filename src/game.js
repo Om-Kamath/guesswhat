@@ -48,6 +48,22 @@ export class Game {
     return [{ type: 'hello', payload: { role: this.state.role } }];
   }
 
+  startRound({ preset, secret, message }) {
+    const p = PRESETS[preset];
+    this.state.preset = preset;
+    this.state.min = p.min;
+    this.state.max = p.max;
+    this.state.secret = secret;
+    this.state.revealMessage = message;
+    this.state.guesses = [];
+    this.state.canConfirmWin = false;
+    this.state.phase = 'playing';
+    this._emit();
+    return [
+      { type: 'round_start', payload: { preset, min: p.min, max: p.max, roundNumber: this.state.roundNumber } },
+    ];
+  }
+
   receive({ type, payload }) {
     const out = [];
     switch (type) {
@@ -66,6 +82,19 @@ export class Game {
           this._seenRoles.has(OPPOSITE[this.state.role])
         ) {
           this.state.phase = 'setup';
+        }
+        this._emit();
+        break;
+      }
+      case 'round_start': {
+        if (this.state.role === 'guesser') {
+          this.state.preset = payload.preset;
+          this.state.min = payload.min;
+          this.state.max = payload.max;
+          this.state.roundNumber = payload.roundNumber;
+          this.state.guesses = [];
+          this.state.canConfirmWin = false;
+          this.state.phase = 'playing';
         }
         this._emit();
         break;

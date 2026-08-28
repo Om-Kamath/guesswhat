@@ -69,3 +69,39 @@ describe('hello handshake', () => {
     expect(g.state.phase).toBe('lobby');
   });
 });
+
+describe('startRound', () => {
+  it('setter enters playing and broadcasts range only', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'setup';
+    const res = g.startRound({ preset: 'medium', secret: 42, message: 'i love you' });
+    expect(g.state.phase).toBe('playing');
+    expect(g.state.min).toBe(1);
+    expect(g.state.max).toBe(100);
+    expect(g.state.secret).toBe(42);
+    expect(g.state.revealMessage).toBe('i love you');
+    const msg = outbound(res, 'round_start');
+    expect(msg.payload).toEqual({ preset: 'medium', min: 1, max: 100, roundNumber: 1 });
+    expect(JSON.stringify(msg)).not.toContain('42');
+    expect(JSON.stringify(msg)).not.toContain('love');
+  });
+});
+
+describe('receive round_start', () => {
+  it('guesser adopts the range and enters playing', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'setup';
+    g.receive({ type: 'round_start', payload: { preset: 'hard', min: 1, max: 1000, roundNumber: 2 }, from: 'x' });
+    expect(g.state.phase).toBe('playing');
+    expect(g.state.min).toBe(1);
+    expect(g.state.max).toBe(1000);
+    expect(g.state.roundNumber).toBe(2);
+  });
+
+  it('setter ignores round_start', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'setup';
+    g.receive({ type: 'round_start', payload: { preset: 'easy', min: 1, max: 20, roundNumber: 1 }, from: 'x' });
+    expect(g.state.phase).toBe('setup');
+  });
+});
