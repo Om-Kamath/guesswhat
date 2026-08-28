@@ -95,6 +95,23 @@ export class Game {
     ];
   }
 
+  playAgain() {
+    freshRound(this.state);
+    this.state.role = OPPOSITE[this.state.role];
+    this.state.roundNumber += 1;
+    this.state.phase = 'setup';
+    this._emit();
+    return [{ type: 'play_again', payload: { roundNumber: this.state.roundNumber } }];
+  }
+
+  newRound() {
+    freshRound(this.state);
+    this.state.roundNumber += 1;
+    this.state.phase = 'setup';
+    this._emit();
+    return [{ type: 'new_round', payload: { roundNumber: this.state.roundNumber } }];
+  }
+
   receive({ type, payload }) {
     const out = [];
     switch (type) {
@@ -151,6 +168,21 @@ export class Game {
         this.state.revealedMessage = payload.message;
         this.state.totalGuesses = payload.totalGuesses;
         this.state.canConfirmWin = false;
+        this._emit();
+        break;
+      }
+      case 'play_again': {
+        freshRound(this.state);
+        this.state.role = OPPOSITE[this.state.role];
+        this.state.roundNumber = payload.roundNumber;
+        this.state.phase = 'setup';
+        this._emit();
+        break;
+      }
+      case 'new_round': {
+        freshRound(this.state);
+        this.state.roundNumber = payload.roundNumber;
+        this.state.phase = 'setup';
         this._emit();
         break;
       }

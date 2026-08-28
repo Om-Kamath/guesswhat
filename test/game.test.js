@@ -178,3 +178,47 @@ describe('confirm win and reveal', () => {
     expect(g.state.totalGuesses).toBe(6);
   });
 });
+
+describe('play again and new round', () => {
+  it('playAgain swaps role and bumps the round', () => {
+    const g = new Game({ role: 'setter', roundNumber: 1 });
+    g.state.phase = 'finished';
+    g.state.secret = 42;
+    g.state.guesses = [{ n: 1, value: 42, hint: null }];
+    const res = g.playAgain();
+    expect(g.state.role).toBe('guesser');
+    expect(g.state.roundNumber).toBe(2);
+    expect(g.state.phase).toBe('setup');
+    expect(g.state.secret).toBe(null);
+    expect(g.state.guesses).toEqual([]);
+    expect(outbound(res, 'play_again').payload).toEqual({ roundNumber: 2 });
+  });
+
+  it('receive play_again swaps the other side symmetrically', () => {
+    const g = new Game({ role: 'guesser', roundNumber: 1 });
+    g.state.phase = 'finished';
+    g.receive({ type: 'play_again', payload: { roundNumber: 2 }, from: 'x' });
+    expect(g.state.role).toBe('setter');
+    expect(g.state.roundNumber).toBe(2);
+    expect(g.state.phase).toBe('setup');
+  });
+
+  it('newRound keeps role and bumps the round', () => {
+    const g = new Game({ role: 'setter', roundNumber: 4 });
+    g.state.phase = 'round_lost';
+    const res = g.newRound();
+    expect(g.state.role).toBe('setter');
+    expect(g.state.roundNumber).toBe(5);
+    expect(g.state.phase).toBe('setup');
+    expect(outbound(res, 'new_round').payload).toEqual({ roundNumber: 5 });
+  });
+
+  it('receive new_round keeps role', () => {
+    const g = new Game({ role: 'guesser', roundNumber: 4 });
+    g.state.phase = 'round_lost';
+    g.receive({ type: 'new_round', payload: { roundNumber: 5 }, from: 'x' });
+    expect(g.state.role).toBe('guesser');
+    expect(g.state.roundNumber).toBe(5);
+    expect(g.state.phase).toBe('setup');
+  });
+});
