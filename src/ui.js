@@ -23,24 +23,32 @@ function banner(state) {
 
 function screenHome(actions) {
   const codeInput = el('input', { class: 'code-input', maxlength: '5', placeholder: 'CODE', autocapitalize: 'characters' });
+  const joinForm = el('form', {
+    class: 'join-row',
+    onsubmit: (e) => { e.preventDefault(); actions.joinGame(codeInput.value.trim().toUpperCase()); },
+  }, [codeInput, el('button', { class: 'secondary', type: 'submit' }, 'Join')]);
   return el('div', { class: 'screen' }, [
     el('h1', { class: 'title', text: 'Guess What' }),
     el('p', { class: 'tagline', text: 'A tiny number game for two.' }),
-    el('button', { class: 'primary', onclick: () => actions.createGame() }, 'Create game'),
-    el('div', { class: 'divider', text: 'or' }),
-    el('form', {
-      class: 'join-row',
-      onsubmit: (e) => { e.preventDefault(); actions.joinGame(codeInput.value.trim().toUpperCase()); },
-    }, [codeInput, el('button', { class: 'secondary', type: 'submit' }, 'Join')]),
+    el('button', { class: 'primary', onclick: () => actions.createGame() }, 'Start a game'),
+    el('p', { class: 'muted', text: 'Got a link from your partner? Just open it.' }),
+    el('details', { class: 'code-fallback' }, [
+      el('summary', {}, 'or enter a code'),
+      joinForm,
+    ]),
   ]);
 }
 
 function screenLobby(state, actions) {
   return el('div', { class: 'screen' }, [
-    el('h2', { text: 'Your room code' }),
-    el('div', { class: 'roomcode', text: state.roomCode || '' }),
-    el('button', { class: 'secondary', onclick: () => actions.copyCode() }, 'Copy code'),
-    el('p', { class: 'muted', text: 'Send it to your partner. Waiting for them to join…' }),
+    el('h2', { text: 'Invite your partner' }),
+    el('button', {
+      class: 'primary',
+      onclick: (e) => actions.shareInvite(e.currentTarget),
+    }, 'Copy invite link'),
+    el('div', { class: 'roomcode small', text: state.roomCode || '' }),
+    el('button', { class: 'link-btn', type: 'button', onclick: () => actions.copyCode() }, 'Copy code instead'),
+    el('p', { class: 'muted', text: 'Waiting for your partner to join…' }),
     el('div', { class: 'spinner' }),
   ]);
 }
@@ -168,6 +176,33 @@ function screenRoundLost(state, actions) {
   ]);
 }
 
+function chatMsgEl(m) {
+  return el('li', { class: 'chat-msg ' + (m.mine ? 'mine' : 'theirs'), text: m.text });
+}
+
+function renderChat(state, actions) {
+  const log = el('ul', { class: 'chat-log' }, state.chatMessages.map(chatMsgEl));
+  const input = el('input', {
+    class: 'chat-input', maxlength: '280', placeholder: 'Say something…', autocomplete: 'off',
+  });
+  const form = el('form', {
+    class: 'chat-form',
+    onsubmit: (e) => {
+      e.preventDefault();
+      const v = input.value.trim();
+      if (v) { actions.sendChat(v); input.value = ''; }
+    },
+  }, [input, el('button', { class: 'secondary', type: 'submit' }, 'Send')]);
+  return el('div', { class: 'chat-panel' }, [log, form]);
+}
+
+export function appendChatMessages(container, messages) {
+  const log = container.querySelector('.chat-log');
+  if (!log) return;
+  for (const m of messages) log.append(chatMsgEl(m));
+  log.scrollTop = log.scrollHeight;
+}
+
 export function render(container, state, actions) {
   container.textContent = '';
   const b = banner(state);
@@ -194,4 +229,10 @@ export function render(container, state, actions) {
       screen = screenHome(actions);
   }
   container.append(screen);
+
+  if (['setup', 'playing', 'finished', 'round_lost'].includes(state.phase)) {
+    container.append(renderChat(state, actions));
+    const log = container.querySelector('.chat-log');
+    if (log) log.scrollTop = log.scrollHeight;
+  }
 }
