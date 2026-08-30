@@ -3,7 +3,8 @@ class FakeRealtime {
     this.clientId = clientId;
     this._peer = null;
     this._handlers = new Map();        // type -> Set<fn>
-    this._presence = { enter: new Set(), leave: new Set() };
+    this._present = false;             // is THIS client in the room
+    this._presenceListeners = [];      // handlers registered via onPresence()
   }
 
   async connect() {}
@@ -22,30 +23,37 @@ class FakeRealtime {
     this._handlers.get(type).add(handler);
   }
 
-  onPresence(event, handler) {
-    this._presence[event].add(handler);
+  onPresence(handler) {
+    this._presenceListeners.push(handler);
+  }
+
+  async otherMembers() {
+    const peer = this._peer;
+    return peer && peer._present ? [{ clientId: peer.clientId }] : [];
+  }
+
+  _firePresence() {
+    const peer = this._peer;
+    queueMicrotask(() => {
+      for (const fn of this._presenceListeners) fn();
+      if (peer) for (const fn of peer._presenceListeners) fn();
+    });
   }
 
   enter() {
-    const peer = this._peer;
-    if (!peer) return;
-    queueMicrotask(() => {
-      for (const fn of peer._presence.enter) fn();
-    });
+    this._present = true;
+    this._firePresence();
   }
 
   leave() {
-    const peer = this._peer;
-    if (!peer) return;
-    queueMicrotask(() => {
-      for (const fn of peer._presence.leave) fn();
-    });
+    this._present = false;
+    this._firePresence();
   }
 
   close() {
+    this._present = false;
     this._handlers.clear();
-    this._presence.enter.clear();
-    this._presence.leave.clear();
+    this._presenceListeners.length = 0;
   }
 }
 

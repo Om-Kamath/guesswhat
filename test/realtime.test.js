@@ -10,6 +10,7 @@ function makeAblyStub() {
       enter: vi.fn().mockResolvedValue(undefined),
       leave: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(),
+      get: vi.fn().mockResolvedValue([]),
     },
   };
   const client = {
@@ -65,12 +66,28 @@ describe('createRealtime', () => {
     expect(seen).toEqual([]);
   });
 
-  it('onPresence maps enter/leave', async () => {
+  it('onPresence subscribes to all presence actions with a bare handler', async () => {
     const { ctor, channel } = makeAblyStub();
     const rt = createRealtime({ roomCode: 'ABCDE', AblyRealtime: ctor });
     await rt.connect();
-    rt.onPresence('enter', () => {});
-    expect(channel.presence.subscribe).toHaveBeenCalledWith('enter', expect.any(Function));
+    const handler = vi.fn();
+    rt.onPresence(handler);
+    expect(channel.presence.subscribe).toHaveBeenCalledWith(expect.any(Function));
+    // simulate Ably firing a presence event
+    channel.presence.subscribe.mock.calls[0][0]();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('otherMembers excludes the own clientId', async () => {
+    const { ctor, channel } = makeAblyStub();
+    channel.presence.get = vi.fn().mockResolvedValue([
+      { clientId: 'someone-else' },
+      { clientId: null },
+    ]);
+    const rt = createRealtime({ roomCode: 'ABCDE', AblyRealtime: ctor });
+    await rt.connect();
+    const others = await rt.otherMembers();
+    expect(others).toEqual([{ clientId: 'someone-else' }, { clientId: null }]);
   });
 
   it('close() leaves presence then closes the client', async () => {
