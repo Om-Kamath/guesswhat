@@ -21,6 +21,26 @@ describe('wire — presence', () => {
     expect(gameA.state.partnerPresent).toBe(true);
   });
 
+  it('a client wired into an already-populated room sees the partner without any further presence event', async () => {
+    const [rtA, rtB] = createFakeRealtimePair();
+    const gameA = new Game({ role: 'setter' });
+    const gameB = new Game({ role: 'guesser' });
+    wire(gameA, rtA);
+    rtA.enter();
+    await flush();
+    // B enters BEFORE wiring, and we let A fully react to that enter first — A
+    // publishes its hello into the void (B has no 'hello' subscriber yet) and
+    // latches prevOthers=1, so it will NOT re-handshake when B wires. The only
+    // remaining path to partnerPresent for B is wire()'s immediate onPresenceChange().
+    rtB.enter();
+    await flush();
+    await flush();
+    wire(gameB, rtB);
+    await flush();
+    await flush();
+    expect(gameB.state.partnerPresent).toBe(true);
+  });
+
   it('a brief leave/enter within the grace period does not fire partner_left', async () => {
     vi.useFakeTimers();
     try {

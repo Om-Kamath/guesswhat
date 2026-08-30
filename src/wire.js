@@ -17,23 +17,34 @@ export function wire(game, rt) {
   let leaveTimer = null;
 
   const onPresenceChange = async () => {
-    const others = (await rt.otherMembers()).length;
-    if (others > 0) {
-      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
-      game.receive({ type: 'partner_here', payload: {} });
-      if (prevOthers === 0) {
-        publish(game.hello());
-        if (game.state.phase !== 'lobby') publish(game.resync());
+    try {
+      const others = (await rt.otherMembers()).length;
+      if (others > 0) {
+        if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+        game.receive({ type: 'partner_here', payload: {} });
+        if (prevOthers === 0) {
+          publish(game.hello());
+          if (game.state.phase !== 'lobby') publish(game.resync());
+        }
+      } else if (prevOthers > 0 && !leaveTimer) {
+        leaveTimer = setTimeout(() => {
+          leaveTimer = null;
+          game.receive({ type: 'partner_left', payload: {} });
+        }, PARTNER_GRACE_MS);
       }
-    } else if (prevOthers > 0 && !leaveTimer) {
-      leaveTimer = setTimeout(() => {
-        leaveTimer = null;
-        game.receive({ type: 'partner_left', payload: {} });
-      }, PARTNER_GRACE_MS);
+      prevOthers = others;
+    } catch {
+      // A failed presence.get() must not surface as an unhandledRejection; the next
+      // presence event re-queries.
     }
-    prevOthers = others;
   };
 
   rt.onPresence(onPresenceChange);
   onPresenceChange();
+
+  // Disposer: cancel a pending grace timer so it can't fire partner_left on a
+  // torn-down game if the local client goes away during the 3s window.
+  return () => {
+    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+  };
 }
