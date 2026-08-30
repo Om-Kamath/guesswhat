@@ -293,6 +293,25 @@ input:focus, textarea:focus { outline-offset: 0; border-color: var(--accent); }
 .code-fallback summary::-webkit-details-marker { display: none; }
 .code-fallback .join-row { margin-top: 10px; }
 
+/* Home — how-to-play */
+.howto { margin-top: 2px; }
+.howto summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  list-style: none;
+}
+.howto summary::-webkit-details-marker { display: none; }
+.howto-list {
+  margin: 10px 0 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.howto-list li { margin-bottom: 6px; }
+.howto-inline { font-size: 0.85rem; margin-top: 4px; }
+
 /* Lobby — small room code + text button */
 .roomcode.small {
   font-size: 1.4rem;

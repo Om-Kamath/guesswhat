@@ -157,7 +157,13 @@ export class Game {
         this.state.partnerPresent = true;
         if (payload.role) {
           this._seenRoles.add(payload.role);
-          if (!this.state.role) this.state.role = OPPOSITE[payload.role];
+          if (!this.state.role) {
+            this.state.role = OPPOSITE[payload.role];
+            // We just learned our own role from a role-ful hello — the peer sent
+            // theirs but has not seen ours, so announce it or their lobby→setup
+            // guard (has-seen-opposite-role) never satisfies and they hang.
+            out.push({ type: 'hello', payload: { role: this.state.role } });
+          }
         } else if (this.state.role && !this._helpedPeer) {
           this._helpedPeer = true;
           out.push({ type: 'hello', payload: { role: this.state.role } });

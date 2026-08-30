@@ -130,3 +130,24 @@ describe('wire — presence', () => {
     expect(emits).toBe(afterFirst);   // no redundant partner_here -> no re-render
   });
 });
+
+describe('wire — link-first handshake', () => {
+  it('creator (setter) and a role-less joiner both reach setup', async () => {
+    // Reproduces the real join flow: the partner opens the invite link, so their
+    // client boots with role === null and only learns its side from the creator's
+    // hello. Both sides must leave the lobby, not just the joiner.
+    const [rtCreator, rtJoiner] = createFakeRealtimePair();
+    const creator = new Game({ role: 'setter' });
+    const joiner = new Game({ role: null });
+    wire(creator, rtCreator);
+    wire(joiner, rtJoiner);
+    rtCreator.enter();
+    rtJoiner.enter();
+    await flush();
+    await flush();
+    await flush();
+    expect(joiner.state.role).toBe('guesser');
+    expect(joiner.state.phase).toBe('setup');
+    expect(creator.state.phase).toBe('setup');
+  });
+});
