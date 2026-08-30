@@ -389,3 +389,69 @@ describe('reconnection', () => {
     expect(g.state.partnerPresent).toBe(false);
   });
 });
+
+describe('chat', () => {
+  it('sendChat appends a mine=true message and returns one trimmed chat message', () => {
+    const g = new Game({ role: 'setter' });
+    const res = g.sendChat('  hey there  ');
+    expect(g.state.chatMessages).toEqual([{ mine: true, text: 'hey there' }]);
+    expect(res).toEqual([{ type: 'chat', payload: { text: 'hey there' } }]);
+  });
+
+  it('sendChat caps text at 280 characters', () => {
+    const g = new Game({ role: 'guesser' });
+    const res = g.sendChat('x'.repeat(500));
+    expect(g.state.chatMessages[0].text).toHaveLength(280);
+    expect(res[0].payload.text).toHaveLength(280);
+  });
+
+  it('sendChat ignores empty / whitespace-only text', () => {
+    const g = new Game({ role: 'setter' });
+    expect(g.sendChat('   ')).toEqual([]);
+    expect(g.sendChat('')).toEqual([]);
+    expect(g.state.chatMessages).toEqual([]);
+  });
+
+  it('receive chat appends a mine=false message regardless of role or phase', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'finished';
+    g.receive({ type: 'chat', payload: { text: 'lol' }, from: 'x' });
+    expect(g.state.chatMessages).toEqual([{ mine: false, text: 'lol' }]);
+  });
+
+  it('snapshot never includes chatMessages', () => {
+    const g = new Game({ role: 'setter' });
+    g.sendChat('secret-ish banter');
+    expect(g.snapshot()).not.toHaveProperty('chatMessages');
+  });
+
+  it('chatMessages clears on startRound', () => {
+    const g = new Game({ role: 'setter' });
+    g.state.phase = 'setup';
+    g.sendChat('a');
+    g.startRound({ preset: 'easy', secret: 5, message: 'm' });
+    expect(g.state.chatMessages).toEqual([]);
+  });
+
+  it('chatMessages clears on round_start (guesser side)', () => {
+    const g = new Game({ role: 'guesser' });
+    g.state.phase = 'playing';
+    g.receive({ type: 'chat', payload: { text: 'c' }, from: 'x' });
+    g.receive({ type: 'round_start', payload: { preset: 'easy', min: 1, max: 20, roundNumber: 2 }, from: 'x' });
+    expect(g.state.chatMessages).toEqual([]);
+  });
+
+  it('chatMessages clears on play_again and new_round', () => {
+    const a = new Game({ role: 'setter' });
+    a.state.phase = 'finished';
+    a.receive({ type: 'chat', payload: { text: 'x' }, from: 'y' });
+    a.playAgain();
+    expect(a.state.chatMessages).toEqual([]);
+
+    const b = new Game({ role: 'guesser' });
+    b.state.phase = 'round_lost';
+    b.receive({ type: 'chat', payload: { text: 'x' }, from: 'y' });
+    b.receive({ type: 'new_round', payload: { roundNumber: 3 }, from: 'y' });
+    expect(b.state.chatMessages).toEqual([]);
+  });
+});

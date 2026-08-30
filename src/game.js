@@ -12,6 +12,7 @@ function freshRound(state) {
   state.totalGuesses = null;
   state.guesses = [];
   state.canConfirmWin = false;
+  state.chatMessages = [];
 }
 
 export class Game {
@@ -30,6 +31,7 @@ export class Game {
       totalGuesses: null,
       canConfirmWin: false,
       partnerPresent: false,
+      chatMessages: [],
     };
     this._listeners = [];
     this._seenRoles = new Set();
@@ -63,6 +65,7 @@ export class Game {
     this.state.secret = secret;
     this.state.revealMessage = message;
     this.state.guesses = [];
+    this.state.chatMessages = [];
     this.state.canConfirmWin = false;
     this.state.phase = 'playing';
     this._emit();
@@ -89,6 +92,14 @@ export class Game {
     if (target) target.hint = direction;
     this._emit();
     return [{ type: 'hint', payload: { direction, forGuessNumber: target ? target.n : null } }];
+  }
+
+  sendChat(text) {
+    const t = String(text).trim().slice(0, 280);
+    if (!t) return [];
+    this.state.chatMessages.push({ mine: true, text: t });
+    this._emit();
+    return [{ type: 'chat', payload: { text: t } }];
   }
 
   confirmWin() {
@@ -171,6 +182,7 @@ export class Game {
           this.state.max = payload.max;
           this.state.roundNumber = payload.roundNumber;
           this.state.guesses = [];
+          this.state.chatMessages = [];
           this.state.canConfirmWin = false;
           this.state.phase = 'playing';
         }
@@ -262,6 +274,11 @@ export class Game {
       }
       case 'partner_left': {
         this.state.partnerPresent = false;
+        this._emit();
+        break;
+      }
+      case 'chat': {
+        this.state.chatMessages.push({ mine: false, text: payload.text });
         this._emit();
         break;
       }

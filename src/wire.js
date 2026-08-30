@@ -1,6 +1,6 @@
 const WIRE_TYPES = [
   'hello', 'round_start', 'guess', 'hint', 'reveal',
-  'play_again', 'new_round', 'resync', 'state_snapshot', 'round_lost',
+  'play_again', 'new_round', 'resync', 'state_snapshot', 'round_lost', 'chat',
 ];
 
 export function wire(game, rt) {
