@@ -2,7 +2,10 @@
 
 A real-time number-guessing game for two people. One sets a secret number and a
 hidden message; the other guesses, getting "higher" / "lower" hints. The hidden
-message is revealed on a correct guess. Roles swap each round.
+message is revealed on a correct guess. Roles swap each round. An always-visible
+chat panel lets you message your partner during each round; the chat clears when
+the round ends. Invite your partner with a link — the URL carries the room code,
+so they join instantly with no code entry needed.
 
 ## Local development
 
@@ -63,3 +66,17 @@ private window).
 - [ ] Bad code: on a fresh browser, "Join with code" with a wrong 5-char code →
       stays on a waiting state, no crash.
 - [ ] No errors in either browser console throughout.
+- [ ] Home: "Start a game" → Lobby shows "Copy invite link". Tapping it copies
+      a URL ending in `#<CODE>` (or opens the share sheet on mobile).
+- [ ] Open that link in the second browser → lands straight in the room, no
+      Home screen, no typing.
+- [ ] "or enter a code" on Home still works as a fallback.
+- [ ] Chat: type a message on each side → it appears on the other side,
+      right-aligned for the sender, left-aligned for the receiver.
+- [ ] Type a half-finished chat message while the partner sends one → your
+      draft is NOT cleared when theirs arrives.
+- [ ] Start the next round → the chat panel is empty on both sides.
+- [ ] Background one phone for ~2s and return → NO "partner disconnected"
+      banner appears.
+- [ ] Fully close one tab → the banner appears after ~3s; reopen the link →
+      banner clears and the round resumes.
