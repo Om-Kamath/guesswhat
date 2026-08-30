@@ -36,6 +36,15 @@ function screenHome(actions) {
       el('summary', {}, 'or enter a code'),
       joinForm,
     ]),
+    el('details', { class: 'howto' }, [
+      el('summary', {}, 'How to play'),
+      el('ul', { class: 'howto-list' }, [
+        el('li', {}, 'One of you is the setter: choose a range, a secret number inside it, and a hidden message.'),
+        el('li', {}, 'The other guesses. After each guess the setter taps ↑ Higher or ↓ Lower.'),
+        el('li', {}, 'Land on the exact number and the hidden message is revealed.'),
+        el('li', {}, 'Roles swap every round. Chat on the side while you play.'),
+      ]),
+    ]),
   ]);
 }
 
@@ -50,6 +59,7 @@ function screenLobby(state, actions) {
     el('button', { class: 'link-btn', type: 'button', onclick: () => actions.copyCode() }, 'Copy code instead'),
     el('p', { class: 'muted', text: 'Waiting for your partner to join…' }),
     el('div', { class: 'spinner' }),
+    el('p', { class: 'muted howto-inline', text: 'You pick a secret number in a range and a hidden message; they guess it using your higher / lower hints. Roles swap each round.' }),
   ]);
 }
 
