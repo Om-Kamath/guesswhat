@@ -58,4 +58,25 @@ describe('full round', () => {
     expect(guesser.state.phase).toBe('setup');
     expect(guesser.state.roundNumber).toBe(2);
   });
+
+  it('chat reaches the partner (not the sender) and clears on a new round', async () => {
+    const [rtA, rtB] = createFakeRealtimePair();
+    const a = new Game({ role: 'setter' });
+    const b = new Game({ role: 'guesser' });
+    wire(a, rtA);
+    wire(b, rtB);
+    rtA.enter();
+    rtB.enter();
+    await flush();
+
+    for (const m of a.sendChat('can i fit six slices')) rtA.send(m.type, m.payload);
+    await flush();
+    expect(b.state.chatMessages).toEqual([{ mine: false, text: 'can i fit six slices' }]);
+    expect(a.state.chatMessages).toEqual([{ mine: true, text: 'can i fit six slices' }]);
+
+    for (const m of a.startRound({ preset: 'easy', secret: 3, message: 'x' })) rtA.send(m.type, m.payload);
+    await flush();
+    expect(a.state.chatMessages).toEqual([]);
+    expect(b.state.chatMessages).toEqual([]);
+  });
 });

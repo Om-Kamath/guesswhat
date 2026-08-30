@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Game } from '../src/game.js';
 import { createFakeRealtimePair } from './fake-realtime.js';
 import { wire } from '../src/wire.js';
@@ -67,9 +67,14 @@ describe('guesser reconnect mid-round', () => {
     expect(setter.state.phase).toBe('playing');
     expect(guesser.state.guesses).toHaveLength(2);
 
-    rtGuesser.leave();
-    await flush();
-    expect(setter.state.partnerPresent).toBe(false);
+    vi.useFakeTimers();
+    try {
+      rtGuesser.leave();
+      await vi.advanceTimersByTimeAsync(3001);
+      expect(setter.state.partnerPresent).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
 
     const { game: rejoined } = await reboot(rtSetter);
 

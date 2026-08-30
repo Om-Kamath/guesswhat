@@ -32,8 +32,13 @@ export function createRealtime({ roomCode, tokenUrl = '/api/ably-token', AblyRea
       });
     },
 
-    onPresence(event, handler) {
-      channel.presence.subscribe(event, () => handler());
+    onPresence(handler) {
+      channel.presence.subscribe(() => handler());
+    },
+
+    async otherMembers() {
+      const members = await channel.presence.get();
+      return members.filter((m) => m.clientId !== clientId);
     },
 
     async close() {

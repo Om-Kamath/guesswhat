@@ -22,21 +22,30 @@ describe('createFakeRealtimePair', () => {
     expect(got).toBe(0);
   });
 
-  it('enter() fires the peer enter handler', async () => {
+  it('otherMembers reflects the peer once both have entered', async () => {
     const [a, b] = createFakeRealtimePair();
-    let entered = 0;
-    b.onPresence('enter', () => { entered++; });
     a.enter();
+    b.enter();
     await flush();
-    expect(entered).toBe(1);
+    expect(await a.otherMembers()).toEqual([{ clientId: b.clientId }]);
+    expect(await b.otherMembers()).toEqual([{ clientId: a.clientId }]);
   });
 
-  it('leave() fires the peer leave handler', async () => {
+  it('onPresence handler fires on peer enter and leave', async () => {
     const [a, b] = createFakeRealtimePair();
-    let left = 0;
-    b.onPresence('leave', () => { left++; });
-    a.leave();
+    let calls = 0;
+    a.onPresence(() => { calls++; });
+    b.enter();
     await flush();
-    expect(left).toBe(1);
+    b.leave();
+    await flush();
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a client sees no other members before the peer enters', async () => {
+    const [a] = createFakeRealtimePair();
+    a.enter();
+    await flush();
+    expect(await a.otherMembers()).toEqual([]);
   });
 });
