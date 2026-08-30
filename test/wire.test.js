@@ -79,4 +79,54 @@ describe('wire — presence', () => {
       vi.useRealTimers();
     }
   });
+
+  it('an out-of-order otherMembers() resolution cannot strand partnerPresent', async () => {
+    // otherMembers() returns 1 then 0, but the FIRST call resolves LAST.
+    let call = 0;
+    const resolvers = [];
+    const rt = {
+      on() {},
+      send() {},
+      _presence: null,
+      onPresence(h) { this._presence = h; },
+      otherMembers() {
+        call += 1;
+        const count = call === 1 ? 1 : 0;   // 1st event: partner present; 2nd: gone
+        return new Promise((res) => resolvers.push(() => res(
+          Array.from({ length: count }, (_, i) => ({ clientId: 'p' + i })),
+        )));
+      },
+    };
+    const game = new Game({ role: 'setter' });
+    wire(game, rt);          // fires onPresenceChange() once (call 1, pending)
+    rt._presence();          // fires again (call 2, pending)
+    await flush();
+    resolvers[1]();          // newer call resolves first: 0 others
+    await flush();
+    resolvers[0]();          // stale call resolves last: 1 other
+    await flush();
+    // Without the generation guard the stale "1" would land last and flip
+    // partnerPresent to true off a superseded query.
+    expect(game.state.partnerPresent).toBe(false);
+  });
+
+  it('a redundant presence event with the partner already present does not re-emit', async () => {
+    const [rtA, rtB] = createFakeRealtimePair();
+    const game = new Game({ role: 'setter' });
+    let emits = 0;
+    game.onChange(() => { emits += 1; });
+    wire(game, rtA);
+    rtA.enter();
+    rtB.enter();
+    await flush();
+    await flush();
+    expect(game.state.partnerPresent).toBe(true);
+    const afterFirst = emits;
+    // A presence event with no membership change (B is already in the room).
+    rtB.enter();
+    await flush();
+    await flush();
+    expect(game.state.partnerPresent).toBe(true);
+    expect(emits).toBe(afterFirst);   // no redundant partner_here -> no re-render
+  });
 });
